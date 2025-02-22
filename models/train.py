@@ -8,6 +8,29 @@ import joblib
 def load_processed_data():
     return pd.read_csv('processed_data/processed.csv')
 
+from sklearn.ensemble import StackingRegressor
+
+def novel_approach():
+    df = load_processed_data()
+    X = df.drop(['selling_price', 'crawled_at', '_id', 'description', 'url', 'pid'], axis=1)
+    y = df['selling_price']
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    base_models = [
+        ('dt', DecisionTreeRegressor()),
+        ('rf', RandomForestRegressor(n_estimators=50))
+    ]
+    
+    stack = StackingRegressor(estimators=base_models, final_estimator=GradientBoostingRegressor())
+    stack.fit(X_train, y_train)
+    y_pred = stack.predict(X_test)
+    
+    return {
+        'MAE': mean_absolute_error(y_test, y_pred),
+        'MSE': mean_squared_error(y_test, y_pred)
+    }
+
 def train_models():
     df = load_processed_data()
     X = df.drop(['selling_price', 'crawled_at', '_id', 'description', 'url', 'pid'], axis=1)
