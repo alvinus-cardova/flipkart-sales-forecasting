@@ -7,44 +7,27 @@ from config import DATA_PATH, SAVE_DIR
 
 def load_data():
     with open(DATA_PATH, 'r') as f:
-        # Load entire JSON array
-        data = json.load(f)
-    
-    # Normalize nested structures
-    df = pd.json_normalize(
-        data,
-        meta=[
-            "_id", "actual_price", "average_rating", "brand", "category",
-            "crawled_at", "description", "discount", "out_of_stock", "pid",
-            "seller", "selling_price", "sub_category", "title", "url"
-        ],
-        record_path="product_details",
-        errors="ignore"
-    )
-    return df
+        data = json.load(f)  # Load entire JSON array
+    return pd.DataFrame(data)
 
 def clean_prices(df):
-    # Clean price columns
     for col in ['actual_price', 'selling_price']:
-        # Remove non-numeric characters (preserve decimals)
-        df[col] = df[col].str.replace('[^0-9.]', '', regex=True)
-        
-        # Replace empty strings with NaN
-        df[col] = df[col].replace('', pd.NA)
-        
-        # Convert to numeric type and fill missing values
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-        df[col].fillna(df[col].median(), inplace=True)
-
-    # Clean discount percentage
-    df['discount_percentage'] = (
-        df['discount']
-        .str.extract('(\d+)', expand=False)
-        .astype(float)
-        .div(100)
-        .fillna(0)
-    )
+        # Use .loc to avoid chained assignment
+        df.loc[:, col] = (
+            df[col]
+            .str.replace('[^0-9.]', '', regex=True)
+            .replace('', pd.NA)
+            .pipe(pd.to_numeric, errors='coerce')
+            .fillna(df[col].median())
+        )
     
+    # Alternative for discount percentage
+    df = df.assign(
+        discount_percentage=df['discount'].str.extract(r'(\d+)', expand=False)
+                                           .astype(float)
+                                           .div(100)
+                                           .fillna(0)
+    )
     return df
 
 def process_datetime(df):
@@ -55,26 +38,23 @@ def process_datetime(df):
     return df
 
 def flatten_product_details(df):
-    # Explode the product_details list
-    df_exploded = df.explode("product_details").reset_index(drop=True)
+    # Check if column exists
+    if 'product_details' not in df.columns:
+        raise ValueError("product_details column missing - check data loading")
     
-    # Extract keys from dictionaries in product_details
-    df_details = pd.json_normalize(df_exploded["product_details"])
-    
-    # Combine with original data
-    return pd.concat([df_exploded.drop("product_details", axis=1), df_details], axis=1)
+    # Explode and normalize
+    df_exploded = df.explode('product_details').reset_index(drop=True)
+    details_df = pd.json_normalize(df_exploded['product_details'])
+    return pd.concat([df_exploded.drop('product_details', axis=1), details_df], axis=1)
 
 def handle_missing_values(df):
-    # Handle remaining missing values
+    # Numerical columns
     num_cols = ['average_rating']
-    cat_cols = ['brand', 'category', 'sub_category', 'Pattern', 'Color']
+    df[num_cols] = df[num_cols].apply(lambda x: x.fillna(x.median()))
     
-    for col in num_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-        df[col].fillna(df[col].median(), inplace=True)
-        
-    for col in cat_cols:
-        df[col] = df[col].fillna('Unknown')
+    # Categorical columns
+    cat_cols = ['brand', 'category', 'sub_category', 'Pattern', 'Color']
+    df[cat_cols] = df[cat_cols].fillna('Unknown')
     
     return df
 
@@ -85,22 +65,22 @@ def encode_categorical(df):
     return df
 
 def preprocess():
-    # Load and normalize data
+    # 1. Load raw data
     df = load_data()
     
-    # Clean prices and discounts
+    # 2. Clean numerical fields
     df = clean_prices(df)
     
-    # Process datetime
+    # 3. Process datetime
     df = process_datetime(df)
     
-    # Flatten nested product_details
+    # 4. Flatten nested structures
     df = flatten_product_details(df)
     
-    # Handle missing values
+    # 5. Handle missing values
     df = handle_missing_values(df)
     
-    # Encode categoricals
+    # 6. Encode categoricals
     df = encode_categorical(df)
     
     # Save processed data
