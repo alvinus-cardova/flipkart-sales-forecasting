@@ -24,8 +24,11 @@ def load_data():
     return df
 
 def clean_prices(df):
-    df['actual_price'] = df['actual_price'].str.replace('[^0-9]', '', regex=True).astype(float)
-    df['selling_price'] = df['selling_price'].str.replace('[^0-9]', '', regex=True).astype(float)
+    # Remove commas and currency symbols
+    df['actual_price'] = df['actual_price'].str.replace('[^0-9.]', '', regex=True).astype(float)
+    df['selling_price'] = df['selling_price'].str.replace('[^0-9.]', '', regex=True).astype(float)
+    
+    # Extract discount percentage
     df['discount_percentage'] = df['discount'].str.extract('(\d+)').astype(float) / 100
     return df
 
@@ -37,10 +40,14 @@ def process_datetime(df):
     return df
 
 def flatten_product_details(df):
-    product_details = df['product_details'].apply(
-        lambda x: {k: v for d in x for k, v in d.items()}
-    )
-    return pd.concat([df.drop('product_details', axis=1), pd.json_normalize(product_details)], axis=1)
+    # Explode the product_details list
+    df_exploded = df.explode("product_details").reset_index(drop=True)
+    
+    # Extract keys from dictionaries in product_details
+    df_details = pd.json_normalize(df_exploded["product_details"])
+    
+    # Combine with original data
+    return pd.concat([df_exploded.drop("product_details", axis=1), df_details], axis=1)
 
 def handle_missing_values(df):
     num_cols = ['actual_price', 'selling_price', 'discount_percentage', 'average_rating']
@@ -59,13 +66,25 @@ def encode_categorical(df):
     return df
 
 def preprocess():
+    # Load and normalize data
     df = load_data()
+    
+    # Clean prices and discounts
     df = clean_prices(df)
+    
+    # Process datetime
     df = process_datetime(df)
+    
+    # Flatten nested product_details
     df = flatten_product_details(df)
+    
+    # Handle missing values
     df = handle_missing_values(df)
+    
+    # Encode categoricals
     df = encode_categorical(df)
     
+    # Save processed data
     os.makedirs(SAVE_DIR, exist_ok=True)
     df.to_csv(f'{SAVE_DIR}/processed.csv', index=False)
     return df
