@@ -15,23 +15,29 @@ def load_data():
     return pd.concat(chunks, ignore_index=True)
 
 def clean_prices(df):
+    # Clean and convert price columns
     for col in ['actual_price', 'selling_price']:
-        # Use .loc to avoid chained assignment
-        df.loc[:, col] = (
-            df[col]
-            .str.replace('[^0-9.]', '', regex=True)
-            .replace('', pd.NA)
-            .pipe(pd.to_numeric, errors='coerce')
-            .fillna(df[col].median())
-        )
+        # Step 1: Remove non-numeric characters
+        cleaned = df[col].str.replace(r'[^0-9.]', '', regex=True)
+        
+        # Step 2: Convert to numeric type
+        numeric_vals = pd.to_numeric(cleaned, errors='coerce')
+        
+        # Step 3: Calculate median from cleaned numeric values
+        median_val = numeric_vals.median()
+        
+        # Step 4: Fill missing values and update dataframe
+        df.loc[:, col] = numeric_vals.fillna(median_val)
     
-    # Alternative for discount percentage
-    df = df.assign(
-        discount_percentage=df['discount'].str.extract(r'(\d+)', expand=False)
-                                           .astype(float)
-                                           .div(100)
-                                           .fillna(0)
+    # Clean discount percentage
+    df['discount_percentage'] = (
+        df['discount']
+        .str.extract(r'(\d+)', expand=False)
+        .astype(float)
+        .div(100)
+        .fillna(0)
     )
+    
     return df
 
 def process_datetime(df):
