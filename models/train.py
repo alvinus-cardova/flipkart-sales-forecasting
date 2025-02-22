@@ -6,13 +6,20 @@ import pandas as pd
 import joblib
 
 def load_processed_data():
-    return pd.read_csv('processed_data/processed.csv')
+    return pd.read_csv(
+        'processed_data/processed.csv',
+        dtype={'discount_percentage': float},
+        low_memory=False
+    )
 
 from sklearn.ensemble import StackingRegressor
 
 def novel_approach():
     df = load_processed_data()
-    X = df.drop(['selling_price', 'crawled_at', '_id', 'description', 'url', 'pid'], axis=1)
+    
+    # Explicitly select only numeric features
+    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+    X = df[numeric_cols].drop(['selling_price'], axis=1)
     y = df['selling_price']
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
