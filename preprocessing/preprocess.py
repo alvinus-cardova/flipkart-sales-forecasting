@@ -6,9 +6,13 @@ from sklearn.preprocessing import LabelEncoder
 from config import DATA_PATH, SAVE_DIR
 
 def load_data():
+    chunks = []
     with open(DATA_PATH, 'r') as f:
-        data = json.load(f)  # Load entire JSON array
-    return pd.DataFrame(data)
+        data = json.load(f)
+        # Process in chunks of 100,000 records
+        for i in range(0, len(data), 100000):
+            chunks.append(pd.json_normalize(data[i:i+100000]))
+    return pd.concat(chunks, ignore_index=True)
 
 def clean_prices(df):
     for col in ['actual_price', 'selling_price']:
