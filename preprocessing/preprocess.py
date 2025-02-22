@@ -15,6 +15,11 @@ def load_data():
     return pd.concat(chunks, ignore_index=True)
 
 def clean_prices(df):
+    # Process prices and discounts first
+    df = df.copy()
+    
+    # Remove original discount column after extracting percentage
+    df = df.drop('discount', axis=1)
     # Clean and convert price columns
     for col in ['actual_price', 'selling_price']:
         # Step 1: Remove non-numeric characters
@@ -48,14 +53,15 @@ def process_datetime(df):
     return df
 
 def flatten_product_details(df):
-    # Check if column exists
-    if 'product_details' not in df.columns:
-        raise ValueError("product_details column missing - check data loading")
+    # After exploding and normalizing product_details
+    df = pd.concat([...], axis=1)
     
-    # Explode and normalize
-    df_exploded = df.explode('product_details').reset_index(drop=True)
-    details_df = pd.json_normalize(df_exploded['product_details'])
-    return pd.concat([df_exploded.drop('product_details', axis=1), details_df], axis=1)
+    # Clean any percentage columns from product_details
+    percentage_cols = [col for col in df.columns if '%' in col]
+    for col in percentage_cols:
+        df[col] = df[col].str.replace('%', '').astype(float)
+    
+    return df
 
 def handle_missing_values(df):
     # Convert average_rating to numeric first
