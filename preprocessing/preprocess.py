@@ -58,11 +58,19 @@ def flatten_product_details(df):
     return pd.concat([df_exploded.drop('product_details', axis=1), details_df], axis=1)
 
 def handle_missing_values(df):
-    # Numerical columns
-    num_cols = ['average_rating']
-    df[num_cols] = df[num_cols].apply(lambda x: x.fillna(x.median()))
+    # Convert average_rating to numeric first
+    df['average_rating'] = pd.to_numeric(
+        df['average_rating'].str.strip().replace('', pd.NA),
+        errors='coerce'
+    )
     
-    # Categorical columns
+    # Fill numeric columns
+    num_cols = ['average_rating']
+    for col in num_cols:
+        median_val = df[col].median()
+        df[col] = df[col].fillna(median_val)
+    
+    # Handle categorical columns
     cat_cols = ['brand', 'category', 'sub_category', 'Pattern', 'Color']
     df[cat_cols] = df[cat_cols].fillna('Unknown')
     
