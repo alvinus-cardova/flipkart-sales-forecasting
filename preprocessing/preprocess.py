@@ -15,33 +15,35 @@ def load_data():
     return pd.concat(chunks, ignore_index=True)
 
 def clean_prices(df):
-    # Process prices and discounts first
-    df = df.copy()
+    # Process discount first before dropping
+    if 'discount' in df.columns:
+        # Create discount_percentage first
+        df['discount_percentage'] = (
+            df['discount']
+            .str.extract(r'(\d+)', expand=False)
+            .astype(float)
+            .div(100)
+            .fillna(0)
+        )
+        # Now safely remove original discount column
+        df = df.drop('discount', axis=1)
+    else:
+        # Create empty discount percentage if column missing
+        df['discount_percentage'] = 0.0
     
-    # Remove original discount column after extracting percentage
-    df = df.drop('discount', axis=1)
-    # Clean and convert price columns
+    # Process prices
     for col in ['actual_price', 'selling_price']:
-        # Step 1: Remove non-numeric characters
-        cleaned = df[col].str.replace(r'[^0-9.]', '', regex=True)
-        
-        # Step 2: Convert to numeric type
-        numeric_vals = pd.to_numeric(cleaned, errors='coerce')
-        
-        # Step 3: Calculate median from cleaned numeric values
-        median_val = numeric_vals.median()
-        
-        # Step 4: Fill missing values and update dataframe
-        df.loc[:, col] = numeric_vals.fillna(median_val)
-    
-    # Clean discount percentage
-    df['discount_percentage'] = (
-        df['discount']
-        .str.extract(r'(\d+)', expand=False)
-        .astype(float)
-        .div(100)
-        .fillna(0)
-    )
+        if col in df.columns:
+            df.loc[:, col] = (
+                df[col]
+                .astype(str)
+                .str.replace(r'[^\d.]', '', regex=True)
+                .replace(r'^$', pd.NA, regex=True)
+                .pipe(pd.to_numeric, errors='coerce')
+                .fillna(df[col].median() if df[col].notna().any() else 0)
+            )
+        else:
+            df[col] = 0.0  # Add missing price columns
     
     return df
 
@@ -92,11 +94,11 @@ def preprocess():
     # 1. Load raw data
     df = load_data()
     
-    # 2. Clean numerical fields
-    df = clean_prices(df)
-    
-    # 3. Process datetime
+    # 2. Process datetime first
     df = process_datetime(df)
+    
+    # 3. Clean prices and discounts
+    df = clean_prices(df)
     
     # 4. Flatten nested structures
     df = flatten_product_details(df)
