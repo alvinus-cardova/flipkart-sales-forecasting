@@ -24,12 +24,27 @@ def load_data():
     return df
 
 def clean_prices(df):
-    # Remove commas and currency symbols
-    df['actual_price'] = df['actual_price'].str.replace('[^0-9.]', '', regex=True).astype(float)
-    df['selling_price'] = df['selling_price'].str.replace('[^0-9.]', '', regex=True).astype(float)
+    # Clean price columns
+    for col in ['actual_price', 'selling_price']:
+        # Remove non-numeric characters (preserve decimals)
+        df[col] = df[col].str.replace('[^0-9.]', '', regex=True)
+        
+        # Replace empty strings with NaN
+        df[col] = df[col].replace('', pd.NA)
+        
+        # Convert to numeric type and fill missing values
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        df[col].fillna(df[col].median(), inplace=True)
+
+    # Clean discount percentage
+    df['discount_percentage'] = (
+        df['discount']
+        .str.extract('(\d+)', expand=False)
+        .astype(float)
+        .div(100)
+        .fillna(0)
+    )
     
-    # Extract discount percentage
-    df['discount_percentage'] = df['discount'].str.extract('(\d+)').astype(float) / 100
     return df
 
 def process_datetime(df):
@@ -50,13 +65,17 @@ def flatten_product_details(df):
     return pd.concat([df_exploded.drop("product_details", axis=1), df_details], axis=1)
 
 def handle_missing_values(df):
-    num_cols = ['actual_price', 'selling_price', 'discount_percentage', 'average_rating']
+    # Handle remaining missing values
+    num_cols = ['average_rating']
     cat_cols = ['brand', 'category', 'sub_category', 'Pattern', 'Color']
     
     for col in num_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
         df[col].fillna(df[col].median(), inplace=True)
+        
     for col in cat_cols:
-        df[col].fillna(df[col].mode()[0], inplace=True)
+        df[col] = df[col].fillna('Unknown')
+    
     return df
 
 def encode_categorical(df):
