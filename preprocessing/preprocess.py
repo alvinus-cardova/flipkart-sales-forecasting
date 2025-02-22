@@ -6,11 +6,22 @@ from sklearn.preprocessing import LabelEncoder
 from config import DATA_PATH, SAVE_DIR
 
 def load_data():
-    data = []
     with open(DATA_PATH, 'r') as f:
-        for line in f:
-            data.append(json.loads(line))
-    return pd.DataFrame(data)
+        # Load entire JSON array
+        data = json.load(f)
+    
+    # Normalize nested structures
+    df = pd.json_normalize(
+        data,
+        meta=[
+            "_id", "actual_price", "average_rating", "brand", "category",
+            "crawled_at", "description", "discount", "out_of_stock", "pid",
+            "seller", "selling_price", "sub_category", "title", "url"
+        ],
+        record_path="product_details",
+        errors="ignore"
+    )
+    return df
 
 def clean_prices(df):
     df['actual_price'] = df['actual_price'].str.replace('[^0-9]', '', regex=True).astype(float)
