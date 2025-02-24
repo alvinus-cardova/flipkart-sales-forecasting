@@ -39,6 +39,6 @@ def preprocess_data(df):
     return df
 
 if __name__ == "__main__":
-    df = load_data('flipkart_fashion_products_dataset.json')
+    df = load_data('/content/drive/MyDrive/flipkart-sales-forecasting/flipkart_fashion_products_dataset.json')
     df = preprocess_data(df)
     df.to_csv('processed_data.csv', index=False)
